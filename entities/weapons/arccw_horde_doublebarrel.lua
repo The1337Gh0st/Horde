@@ -22,14 +22,18 @@ SWEP.Slot = 2
 SWEP.UseHands = true
 
 SWEP.ViewModel = "models/weapons/arccw/fesiugmw2_2/c_ranger_2.mdl"
-SWEP.MirrorVMWM = false
-SWEP.WorldModel = "models/weapons/w_shotgun.mdl"
+SWEP.MirrorVMWM = true
+SWEP.WorldModelOffset = {
+    pos = Vector(-10, 3, -5),
+    ang = Angle(-10, 0, 180),
+    scale = 1.5
+}
 SWEP.ViewModelFOV = 65
 
-SWEP.Damage = 75
-SWEP.DamageMin = 35
+SWEP.Damage = 50
+SWEP.DamageMin = 25
 SWEP.Range = 400 * 0.025  -- GAME UNITS * 0.025 = METRES
-SWEP.RangeMin = 200 * 0.025  -- GAME UNITS * 0.025 = METRES
+SWEP.RangeMin = 100 * 0.025  -- GAME UNITS * 0.025 = METRES
 SWEP.Penetration = 1
 SWEP.DamageType = DMG_BULLET
 SWEP.ShootEntity = nil -- entity to fire, if any
@@ -51,14 +55,15 @@ SWEP.Firemodes = {
         Mode = 1,
     },
     {
-        Mode = 0,
+        Mode = 3,
+        PrintName = "Double Shot"
     },
 }
 
 SWEP.NPCWeaponType = "weapon_shotgun"
 SWEP.NPCWeight = 125
 
-SWEP.AccuracyMOA = 100 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
+SWEP.AccuracyMOA = 1000 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
 SWEP.HipDispersion = 250 -- inaccuracy added by hip firing.
 SWEP.MoveDispersion = 50 -- inaccuracy added by moving. Applies in sights as well! Walking speed is considered as "maximum".
 SWEP.SightsDispersion = 0 -- dispersion that remains even in sights
@@ -183,11 +188,12 @@ SWEP.Attachments = {
     },
     {
         PrintName = "Ammo Type",
-        Slot = "ammo_shotgun"
+        Slot = "go_ammo",
+        DefaultAttName = "Buckshot Shells"
     },
     {
         PrintName = "Perk",
-        Slot = "perk"
+        Slot = "go_perk"
     },
 	{
         PrintName = "Charm",
@@ -280,3 +286,25 @@ local nvcnaw2 = 5
 SWEP.Inaccuracy_Add_ADS			= 0
 SWEP.Inaccuracy_Add_Hip			= 0
 SWEP.Inaccuracy_Add_Move		= 0.1
+
+
+function SWEP:Hook_ShouldNotFireFirst()
+    if self:GetCurrentFiremode().Mode == 3 then
+        self.AccuracyMOA = 200
+    else
+        self.AccuracyMOA = 100
+    end
+end
+
+function SWEP:Hook_ShouldNotFire()
+    if CLIENT then return end
+    if self:GetCurrentFiremode().Mode == 3 then
+        local ply = self:GetOwner()
+        if self:Clip1() >= 2 and !ply:KeyDown(IN_USE) then
+            local dir = -ply:GetForward()
+            dir:Normalize()
+            local vel = dir * 350
+            ply:SetLocalVelocity(ply:GetVelocity() + vel)
+        end
+    end
+end

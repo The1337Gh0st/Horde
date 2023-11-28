@@ -9,7 +9,7 @@ SWEP.Category = "ArcCW - Horde"
 SWEP.AdminOnly = false
 SWEP.WeaponCamBone = tag_camera
 
-SWEP.PrintName = "Vector (Horde)"
+SWEP.PrintName = "Vector Medic PDW"
 SWEP.Trivia_Class = "Sub Machine Gun"
 SWEP.Trivia_Desc = "Fully automatic, high fire rate."
 
@@ -26,8 +26,12 @@ SWEP.Slot = 2
 SWEP.UseHands = true
 
 SWEP.ViewModel = "models/weapons/arccw/fesiugmw2/c_vector.mdl"
-SWEP.MirrorVMWM = false
-SWEP.WorldModel = "models/weapons/w_smg_ump45.mdl"
+SWEP.WorldModel = "models/weapons/arccw/fesiugmw2/c_vector.mdl"
+SWEP.WorldModelOffset = {
+    pos = Vector(-5, 3, -5),
+    ang = Angle(-10, 0, 180),
+}
+SWEP.MirrorVMWM = true
 SWEP.ViewModelFOV = 65
 
 SWEP.Damage = 25
@@ -54,14 +58,8 @@ SWEP.Firemodes = {
         Mode = 2,
     },
     {
-        Mode = -2,
+        Mode = 0,
     },
-    {
-        Mode = 1,
-    },
-    {
-        Mode = 0
-    }
 }
 
 SWEP.NPCWeaponType = {"weapon_ar2", "weapon_smg1"}
@@ -76,7 +74,7 @@ SWEP.Primary.Ammo = "pistol" -- what ammo type the gun uses
 SWEP.ShootVol = 110 -- volume of shoot sound
 SWEP.ShootPitch = 110 -- pitch of shoot sound
 
-SWEP.ShootSound =			"weapons/fesiugmw2/fire/kriss.wav"
+SWEP.ShootSound =			"horde/weapons/vector/kriss1.ogg"
 SWEP.ShootMechSound =       ArcCW_MW2_Mech
 --SWEP.DistantShootSound =	"weapons/fesiugmw2/fire_distant/kriss.wav"
 SWEP.ShootSoundSilenced =	"weapons/fesiugmw2/fire/mp5_sil.wav"
@@ -230,6 +228,7 @@ SWEP.Attachments = {
         DefaultAttName = "None",
         Slot = "mw2_wepcamo",
         FreeSlot = true,
+        InstalledEles = {"wepcamo-blackout"},
     },
 	{
         PrintName = "Charm",
@@ -344,17 +343,17 @@ function SWEP:ChangeFiremode(pred)
 
         for _, ent in pairs(ents.FindInSphere(tr.HitPos, 100)) do
             if ent:IsPlayer() then
-                local healinfo = HealInfo:New({amount=10, healer=self.Owner})
+                local healinfo = HealInfo:New({amount=12, healer=self.Owner})
                 HORDE:OnPlayerHeal(ent, healinfo)
             elseif ent:GetClass() == "npc_vj_horde_antlion" then
-                local healinfo = HealInfo:New({amount=10, healer=self.Owner})
+                local healinfo = HealInfo:New({amount=12, healer=self.Owner})
                 HORDE:OnAntlionHeal(ent, healinfo)
             elseif ent:IsNPC() then
                 local dmg = DamageInfo()
                 dmg:SetDamage(25)
                 dmg:SetDamageType(DMG_NERVEGAS)
                 dmg:SetAttacker(self.Owner)
-                dmg:SetInflictor(self.Horde_Wpn_Owner)
+                dmg:SetInflictor(self)
                 dmg:SetDamagePosition(tr.HitPos)
                 ent:TakeDamageInfo(dmg)
             end
@@ -365,4 +364,38 @@ function SWEP:ChangeFiremode(pred)
 
     self:SetNextSecondaryFire(CurTime() + 1.5)
     return true
+end
+
+function SWEP:Hook_Think()
+    if SERVER then return end
+    local tr = util.TraceHull({
+        start = self:GetOwner():GetShootPos(),
+        endpos = self:GetOwner():GetShootPos() + self:GetOwner():GetAimVector() * 5000,
+        filter = filter,
+        mins = Vector(-20, -20, -8),
+        maxs = Vector(20, 20, 8),
+        mask = MASK_SHOT_HULL
+    })
+
+    if tr.Hit and tr.Entity and tr.Entity:IsPlayer()then
+        self.Horde_HealTarget = tr.Entity
+    else
+        self.Horde_HealTarget = nil
+    end
+end
+
+local function nv_center(ent)
+	return ent:LocalToWorld(ent:OBBCenter())
+end
+
+function SWEP:Hook_DrawHUD()
+    if self.Horde_HealTarget then
+        local pos = nv_center(self.Horde_HealTarget):ToScreen()
+		surface.SetDrawColor(Color(50, 200, 50))
+        surface.DrawCircle(pos.x, pos.y, 30)
+        --surface.DrawLine(pos.x, 0, pos.x, ScrH())
+        --surface.DrawLine(0, pos.y, ScrW(), pos.y)
+        draw.DrawText(self.Horde_HealTarget:Health(), "Trebuchet24",
+        pos.x - 15, pos.y - 15, Color(50, 200, 50), TEXT_ALIGN_LEFT)
+    end
 end

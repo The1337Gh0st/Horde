@@ -9,7 +9,7 @@ SWEP.Category = "ArcCW - Horde"
 SWEP.AdminOnly = false
 SWEP.WeaponCamBone = tag_camera
 
-SWEP.PrintName = "F2000 (Horde)"
+SWEP.PrintName = "F2000"
 SWEP.Trivia_Class = "Assault Rifle"
 SWEP.Trivia_Desc = "Fully automatic, all purpose weapon.\n\n\nFish."
 
@@ -26,13 +26,16 @@ SWEP.Slot = 2
 SWEP.UseHands = true
 
 SWEP.ViewModel = "models/weapons/arccw/fesiugmw2/c_f2000_2a.mdl"
-SWEP.MirrorVMWM = false
-SWEP.WorldModel = "models/weapons/w_rif_famas.mdl"
+SWEP.MirrorVMWM = true
+SWEP.WorldModelOffset = {
+    pos = Vector(-5, 3, -5),
+    ang = Angle(-10, 0, 180),
+    scale = 1.25
+}
 SWEP.ViewModelFOV = 65
 
 SWEP.Damage = 38
-SWEP.DamageMin = 34
-SWEP.RangeMin = 1500 * 0.025  -- GAME UNITS * 0.025 = METRES
+SWEP.DamageMin = 25
 SWEP.Range = 2000 * 0.025  -- GAME UNITS * 0.025 = METRES
 SWEP.Penetration = 7
 SWEP.DamageType = DMG_BULLET
@@ -44,12 +47,12 @@ SWEP.Primary.ClipSize = 30 -- DefaultClip is automatically set.
 SWEP.ExtendedClipSize = 45
 SWEP.ReducedClipSize = 15
 
-SWEP.VisualRecoilMult = 0
 SWEP.Recoil = 0.45
 SWEP.RecoilSide = 0.45
-SWEP.RecoilRise = 0
+SWEP.RecoilRise = 0.2
+SWEP.RecoilPunch = 2.5
 
-SWEP.Delay = 0.065 -- 60 / RPM.
+SWEP.Delay = 60/850 -- 60 / RPM.
 SWEP.Num = 1 -- number of shots per trigger pull.
 SWEP.Firemodes = {
     {
@@ -66,7 +69,7 @@ SWEP.Firemodes = {
 SWEP.NPCWeaponType = {"weapon_ar2", "weapon_smg1"}
 SWEP.NPCWeight = 150
 
-SWEP.AccuracyMOA = 5 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
+SWEP.AccuracyMOA = 6 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
 SWEP.HipDispersion = 600 -- inaccuracy added by hip firing.
 SWEP.MoveDispersion = 300
 
@@ -160,9 +163,6 @@ SWEP.AttachmentElements = {
 
 SWEP.ExtraSightDist = 5
 
-SWEP.RejectAttachments = {
-}
-
 SWEP.Attachments = {
     {
         PrintName = "Optic",
@@ -215,11 +215,12 @@ SWEP.Attachments = {
     },
     {
         PrintName = "Ammo Type",
-        Slot = "ammo_bullet"
+        Slot = "go_ammo",
+        DefaultAttName = "Standard Ammo"
     },
     {
         PrintName = "Perk",
-        Slot = "perk"
+        Slot = "go_perk"
     },
     {
         PrintName = "Camouflage",

@@ -12,6 +12,7 @@ function HORDE:ApplyDamage(npc, hitgroup, dmginfo)
     if dmginfo:GetDamageCustom() > 0 then return end
     if dmginfo:GetDamage() <= 0 then return end
     if not npc:IsValid() then return end
+    if GetConVar("horde_corpse_cleanup"):GetInt() == 1 and npc:Health() <= 0 then npc:Remove() return end
 
     local attacker = dmginfo:GetAttacker()
     if not IsValid(attacker) then return end
@@ -32,6 +33,8 @@ function HORDE:ApplyDamage(npc, hitgroup, dmginfo)
     local more = 1
     local base_add = 0
     local post_add = 0
+    --dmginfo:SetDamage(1000)
+    --npc:Horde_AddDebuffBuildup(HORDE.Status_Stun, dmginfo:GetDamage() * 10, ply, dmginfo:GetDamagePosition())
 
     -- Apply bonus
     local bonus = {increase=increase, more=more, base_add=base_add, post_add=post_add}
@@ -111,6 +114,14 @@ function HORDE:ApplyDamage(npc, hitgroup, dmginfo)
     end
 
     hook.Run("Horde_OnPlayerDamagePost", ply, npc, bonus, hitgroup, dmginfo)
+    
+    if not npc.Horde_Assist then
+        npc.Horde_Assist = ply
+    elseif ply ~= npc.Horde_Hit then
+        npc.Horde_Assist = npc.Horde_Hit
+    end
+
+    npc.Horde_Hit = ply
 end
 
 function entmeta:TakeDamageOverTime(attacker, dmg, dmgtype, interval, duration)
@@ -120,6 +131,7 @@ function entmeta:TakeDamageOverTime(attacker, dmg, dmgtype, interval, duration)
     dmginfo:SetDamageType(dmgtype)
     dmginfo:SetDamage(dmg)
     dmginfo:SetDamageCustom(HORDE.DMG_OVER_TIME)
+    dmginfo:SetDamagePosition(self:GetPos())
 
     self:TakeDamageInfo(dmginfo)
     for i = 1, duration / interval do
@@ -131,6 +143,7 @@ function entmeta:TakeDamageOverTime(attacker, dmg, dmgtype, interval, duration)
                 dmginfo2:SetDamageType(dmgtype)
                 dmginfo2:SetDamage(dmg)
                 dmginfo2:SetDamageCustom(HORDE.DMG_OVER_TIME)
+                dmginfo2:SetDamagePosition(self:GetPos())
                 self:TakeDamageInfo(dmginfo2)
             end
         end)
@@ -140,8 +153,8 @@ end
 function HORDE:ApplyDamageInRadius(pos, radius, dmginfo, callback)
     for _, ent in pairs(ents.FindInSphere(pos, radius)) do
         if ent:IsNPC() and HORDE:IsPlayerOrMinion(ent) ~= true then
-            ent:TakeDamageInfo(dmginfo)
             dmginfo:SetDamagePosition(ent:GetPos())
+            ent:TakeDamageInfo(dmginfo)
             if callback then
                 callback(ent)
             end
@@ -185,6 +198,7 @@ function HORDE:TakeDamage(victim, damage, dmgtype, attacker, inflictor, damage_c
         dmginfo:SetInflictor(Entity(0))
     end
     
+    dmginfo:SetDamagePosition(victim:GetPos())
     
     if dmgtype then
         dmginfo:SetDamageType(dmgtype)
@@ -244,7 +258,8 @@ hook.Add("EntityTakeDamage", "Horde_ApplyDamageTaken", function (target, dmg)
     
     -- Apply bonus
     local bonus = {resistance=0, less=1, evasion=0, block=0}
-    hook.Run("Horde_OnPlayerDamageTaken", ply, dmg, bonus)
+    local ret = hook.Run("Horde_OnPlayerDamageTaken", ply, dmg, bonus)
+    if ret then return end
     if bonus.evasion > 0 then
         local evade = math.random()
         if evade <= bonus.evasion then
@@ -347,8 +362,8 @@ hook.Add("EntityTakeDamage", "Horde_ApplyMinionDamageTaken", function (target, d
     hook.Run("Horde_OnMinionDamageTaken", target, dmg)
     if dmg:GetDamage() <= 0.5 then return true end
 
-    if dmg:GetAttacker():GetClass() == "npc_vj_horde_grigori" then
-        dmg:ScaleDamage(2)
+    if dmg:GetAttacker():GetClass() == "npc_vj_horde_grigori" or dmg:GetAttacker().Horde_Plague_Soldier then
+        dmg:ScaleDamage(2.5)
     end
 
     local debuff = nil
@@ -397,6 +412,18 @@ hook.Add("EntityTakeDamage", "Horde_MutationDamage", function (target, dmg)
     end
 end)
 
+hook.Add("Horde_OnPlayerDamageTaken",  "Horde_MeteorDefense", function (ply, dmginfo, bonus)
+    if ply:Horde_GetMaxMind() > 0 and IsValid(dmginfo:GetInflictor()) and dmginfo:GetInflictor():GetClass() == "projectile_horde_meteor" then
+        if dmginfo:IsDamageType(DMG_BLAST) then
+            dmginfo:SetDamage(math.min(10, dmginfo:GetDamage()))
+            dmginfo:SetDamageType(DMG_DIRECT)
+        else
+            dmginfo:SetDamage(math.min(70, dmginfo:GetDamage()))
+            dmginfo:SetDamageType(DMG_DIRECT)
+        end
+    end
+end)
+
 -- Main target does not take splash damage
 hook.Add("EntityTakeDamage", "Horde_SplashDamage", function (target, dmg)
     if target:IsValid() and target:IsNPC() and dmg:GetInflictor() == target and dmg:GetAttacker():IsPlayer() and dmg:GetDamageCustom() == HORDE.DMG_SPLASH then
@@ -409,10 +436,4 @@ hook.Add("ScaleNPCDamage", "Horde_BossHeadshotDamage", function (npc, hitgroup, 
     if npc:IsValid() and npc:Horde_GetBossProperties() and hitgroup == HITGROUP_HEAD then
         dmg:ScaleDamage(0.70)
     end
-end)
-
-hook.Add("OnNPCKilled", "Horde_OnNPCKilledHook", function (victim, killer, wpn)
-    if not killer:IsPlayer() then return end
-    if not victim:IsValid() or not victim:IsNPC() or not killer:IsPlayer() then return end
-    hook.Run("Horde_OnNPCKilled", victim, killer, wpn)
 end)

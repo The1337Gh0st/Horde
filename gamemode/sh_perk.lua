@@ -33,6 +33,7 @@ if CLIENT then
         local ply = net.ReadEntity()
         local perk_choices = net.ReadTable()
         if ply ~= MySelf then
+            if !IsValid(ply) then return end
             if not ply.Horde_PerkChoices then ply.Horde_PerkChoices = {} end
             if not ply:Horde_GetCurrentSubclass() then return end
             ply.Horde_PerkChoices[ply:Horde_GetCurrentSubclass()] = perk_choices
@@ -82,7 +83,11 @@ function plymeta:Horde_SetPerk(perk, shared)
     if SERVER then
         hook.Run("Horde_PrecomputePerkLevelBonus", self)
     end
-    hook.Run("Horde_OnSetPerk", self, perk)
+
+    if self:Alive() then
+        -- No need to set perks when dead
+        hook.Run("Horde_OnSetPerk", self, perk)
+    end
 
     if SERVER and not shared then
         net.Start("Horde_Perk")

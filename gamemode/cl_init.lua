@@ -16,6 +16,8 @@ include("sh_custom.lua")
 include("sh_rank.lua")
 include("sh_sync.lua")
 include("sh_misc.lua")
+include("sh_objective.lua")
+include("sh_spells.lua")
 
 include("cl_economy.lua")
 include("cl_achievement.lua")
@@ -25,22 +27,36 @@ include("gui/cl_status.lua")
 include("gui/cl_ready.lua")
 include("gui/cl_class.lua")
 include("gui/cl_description.lua")
+include("gui/cl_spelldescription.lua")
 include("gui/cl_infusion.lua")
 include("gui/cl_item.lua")
+include("gui/cl_spellitem.lua")
 include("gui/cl_itemconfig.lua")
 include("gui/cl_classconfig.lua")
 include("gui/cl_enemyconfig.lua")
 include("gui/cl_mapconfig.lua")
 include("gui/cl_configmenu.lua")
 include("gui/cl_shop.lua")
+include("gui/cl_spellforge.lua")
 include("gui/cl_stats.lua")
 include("gui/cl_summary.lua")
 include("gui/cl_scoreboard.lua")
 include("gui/cl_3d2d.lua")
 include("gui/cl_subclassbutton.lua")
 include("gui/cl_perkbutton.lua")
-include("gui/npcinfo/sh_npcinfo.lua")
-include("gui/npcinfo/cl_npcinfo.lua")
+include("gui/cl_leaderboard.lua")
+
+include("status/sh_mind.lua")
+include("gui/scoreboard/dpingmeter.lua")
+include("gui/scoreboard/dheaderpanel.lua")
+include("gui/scoreboard/dplayerline.lua")
+
+include("arccw/attachments/horde_akimbo_deagle.lua")
+include("arccw/attachments/horde_akimbo_m9.lua")
+include("arccw/attachments/horde_akimbo_glock.lua")
+include("arccw/attachments/horde_ubgl_medic.lua")
+include("arccw/attachments/horde_ammo_ap.lua")
+include("arccw/attachments/horde_ammo_sabot.lua")
 
 -- Some users report severe lag with halo
 CreateConVar("horde_enable_halo", 1, FCVAR_LUA_CLIENT, "Enables highlight for last 10 enemies.")
@@ -55,6 +71,26 @@ hook.Add("InitPostEntity", "GetLocal", function()
 end)
 
 function HORDE:ToggleShop()
+    if MySelf:Horde_GetCurrentSubclass() == "Necromancer" or MySelf:Horde_GetCurrentSubclass() == "Artificer" or MySelf:Horde_GetCurrentSubclass() == "Warlock" then
+        if not HORDE.ShopGUI then
+            HORDE.ShopGUI = vgui.Create("HordeSpellForge")
+            HORDE.ShopGUI:SetVisible(false)
+        end
+    
+        if HORDE.ShopGUI:IsVisible() then
+            HORDE.ShopGUI:Hide()
+            gui.EnableScreenClicker(false)
+        else
+            HORDE.ShopGUI:Remove()
+            if HORDE.StatsGUI then
+                HORDE.StatsGUI:Remove()
+            end
+            HORDE.ShopGUI = vgui.Create("HordeSpellForge")
+            HORDE.ShopGUI:Show()
+            gui.EnableScreenClicker(true)
+        end
+        return
+    end
     if not HORDE.ShopGUI then
         HORDE.ShopGUI = vgui.Create("HordeShop")
         HORDE.ShopGUI:SetVisible(false)
@@ -219,6 +255,20 @@ net.Receive("Horde_HighlightEntities", function (len, ply)
     end
 end)
 
+net.Receive("Horde_HighlightSonar", function (len, ply)
+    local entity = net.ReadEntity()
+    local highlight = net.ReadBool()
+    local idx = entity:EntIndex()
+    if highlight == true then
+        hook.Add("PreDrawHalos", "Horde_SonarHalo" .. idx, function()
+            if !entity:IsValid() then hook.Remove("PreDrawHalos", "Horde_SonarHalo" .. idx) end
+            halo.Add({entity}, Color(255, 255, 255), 5, 5, 1, true, true)
+        end)
+    else
+        hook.Remove("PreDrawHalos", "Horde_SonarHalo" .. idx)
+    end
+end)
+
 net.Receive("Horde_DeathMarkHighlight", function(len,ply)
     local entity = net.ReadEntity()
     local idx = entity:EntIndex()
@@ -293,6 +343,7 @@ net.Receive("Horde_ForceCloseShop", function ()
     end
 
     HORDE.TipPanel:SetVisible(false)
+    HORDE.leader_board:SetVisible(false)
 
     gui.EnableScreenClicker(false)
 end)
@@ -311,6 +362,12 @@ net.Receive("Horde_SideNotificationDebuff", function(length)
     local debuff = net.ReadUInt(32)
     local debuff_str = translate.Get("Notifications_Debuff_" .. HORDE.Status_String[debuff]) or HORDE.Debuff_Notifications[debuff]
     HORDE:PlayNotification(debuff_str, 0, HORDE.Status_Icon[debuff], HORDE.STATUS_COLOR[debuff])
+end)
+
+net.Receive("Horde_SideNotificationObjective", function(length)
+    local obj = net.ReadUInt(4)
+    local str = net.ReadString()
+    HORDE:PlayNotification(str, 0, HORDE.Objective_Icon[obj], Color(0,255,0))
 end)
 
 net.Receive("Horde_SyncItems", function ()
@@ -383,3 +440,7 @@ killicon.AddAlias("arccw_horde_awp", "arccw_go_awp")
 killicon.AddAlias("arccw_horde_barret", "arccw_mw2_barrett")
 killicon.Add("arccw_nade_medic", "arccw/weaponicons/arccw_nade_medic", Color(0, 0, 0, 255))
 killicon.Add("npc_turret_floor", "vgui/hud/npc_turret_floor", Color(0, 0, 0, 255))
+killicon.AddAlias("npc_vj_horde_shotgun_turret", "npc_turret_floor")
+killicon.AddAlias("npc_vj_horde_sniper_turret", "npc_turret_floor")
+killicon.Add("npc_vj_horde_antlion", "vgui/hud/antlion", Color(0, 0, 0, 255))
+killicon.AddAlias("projectile_horde_antlion_bile", "npc_vj_horde_antlion")

@@ -16,16 +16,37 @@ function GM:Initialize()
         name = "arccw_horde_nade_molotov"
     })
     game.AddAmmoType({
-        name = "arccw_go_nade_frag"
+        name = "arccw_nade_m67"
     })
     game.AddAmmoType({
-        name = "arccw_nade_medic"
+        name = "arccw_horde_m67"
+    })
+    game.AddAmmoType({
+        name = "arccw_nade_medic_ubgl"
     })
     game.AddAmmoType({
         name = "arccw_nade_knife"
     })
     game.AddAmmoType({
         name = "arccw_horde_nade_stun"
+    })
+    game.AddAmmoType({
+        name = "arccw_horde_nade_nanobot",
+    })
+    game.AddAmmoType({
+        name = "arccw_horde_nade_hemo",
+    })
+    game.AddAmmoType({
+        name = "arccw_horde_nade_shrapnel",
+    })
+    game.AddAmmoType({
+        name = "arccw_horde_nade_sonar",
+    })
+    game.AddAmmoType({
+        name = "arccw_horde_nade_emp",
+    })
+    game.AddAmmoType({
+        name = "horde_mine",
     })
     if SERVER then
         HORDE.NPCS = list.Get("NPC")
@@ -34,13 +55,34 @@ end
 
 function GM:PlayerLoadout(ply) return true end
 
+if CLIENT then
+    AllowSandbox = false -- removed local so you can use this variable anywhere, if it's needed then add it back 
+
+    net.Receive("Horde_SyncSBox", function()
+        AllowSandbox = net.ReadBool()
+    end)
+end
+
 local function CheckAllowHook(hook_name)
-    if GetConVar("horde_enable_sandbox"):GetBool() then
+    if AllowSandbox then
         hook.Call(hook_name)
         return true
     else
         return false
     end
+end
+
+if SERVER then
+util.AddNetworkString("Horde_SyncSBox")
+net.Start("Horde_SyncSBox")
+    local EnableSBox = false
+    if(GetConVar("horde_enable_sandbox"):GetInt() == 0) then -- read serverside's ConVar and broadcast to all clients
+        EnableSBox = false
+    else
+        EnableSBox = true
+    end
+    net.WriteBool( EnableSBox )
+net.Broadcast()
 end
 
 local function CheckAllowFeature()
@@ -128,6 +170,23 @@ function GM:ShouldCollide(ent1, ent2)
     end
 
     return true
+end
+
+function GM:PlayerButtonDown(ply, button)
+    if (ply:Horde_GetMaxMind() <= 0) then return end
+    if button != KEY_F then return end
+    if CLIENT then
+		if ( IsFirstTimePredicted() ) then ply.Horde_UseSpellUtlity = true end
+	else
+		ply.Horde_UseSpellUtlity = true
+	end
+end
+
+function GM:PlayerButtonUp(ply, button)
+    if not IsFirstTimePredicted() then return end
+    if (ply:Horde_GetMaxMind() <= 0) then return end
+    if button != KEY_F then return end
+    ply.Horde_UseSpellUtlity = nil
 end
 --[[
 function GM:SetupWorldFog()

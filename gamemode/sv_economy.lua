@@ -1,8 +1,11 @@
 concommand.Add("horde_drop_money", function (ply, cmd, args)
-    ply:Horde_DropMoney()
+    ply:Horde_DropMoney(args[1])
 end)
 
 concommand.Add("horde_drop_weapon", function (ply, cmd, args)
+    if ply:GetActiveWeapon() and ply:GetActiveWeapon():IsValid() and ply:GetActiveWeapon().Base == "horde_spell_weapon_base" then
+        return
+    end
     ply:DropWeapon()
 end)
 
@@ -10,6 +13,8 @@ util.AddNetworkString("Horde_BuyItem")
 util.AddNetworkString("Horde_BuyItemAmmoPrimary")
 util.AddNetworkString("Horde_BuyItemAmmoSecondary")
 util.AddNetworkString("Horde_BuyItemUpgrade")
+util.AddNetworkString("Horde_BuySpellUpgrade")
+util.AddNetworkString("Horde_BuySpell")
 util.AddNetworkString("Horde_SellItem")
 util.AddNetworkString("Horde_SelectClass")
 util.AddNetworkString("Horde_InitClass")
@@ -28,6 +33,26 @@ function plymeta:Horde_SetMaxHealth(base)
         hook.Run("Horde_OnSetMaxHealth", self, bonus)
         self:SetMaxHealth(bonus.add + base * bonus.more * (1 + bonus.increase))
         self:SetHealth(self:GetMaxHealth())
+    end)
+end
+
+function plymeta:Horde_SetMaxArmor(base)
+    timer.Simple(0, function ()
+        if not self:IsValid() then return end
+        if not base then base = 100 end
+        local bonus = {increase = 0, more = 1, add = 0}
+        hook.Run("Horde_OnSetMaxArmor", self, bonus)
+        self:SetMaxArmor(bonus.add + base * bonus.more * (1 + bonus.increase))
+    end)
+end
+
+function plymeta:Horde_SetMaxHealthOnly(base)
+    timer.Simple(0, function ()
+        if not self:IsValid() then return end
+        if not base then base = 100 end
+        local bonus = {increase = 0, more = 1, add = 0}
+        hook.Run("Horde_OnSetMaxHealth", self, bonus)
+        self:SetMaxHealth(bonus.add + base * bonus.more * (1 + bonus.increase))
     end)
 end
 
@@ -178,14 +203,17 @@ function plymeta:Horde_GetDropEntities()
     return self.Horde_drop_entities
 end
 
-function plymeta:Horde_DropMoney()
-    if self:Horde_GetMoney() >= 50 and self:Alive() then
+function plymeta:Horde_DropMoney(amount)
+    if not amount then amount = 50 end
+	amount = math.floor(tonumber(amount)) -- ensure that unholy amounts of money are not being dropped
+	if not amount or amount < 50 then amount = 50 end 
+    if self:Horde_GetMoney() >= amount and self:Alive() then
         local res = hook.Run("Horde_PlayerDropMoney", self)
         if res then
             self:Horde_SyncEconomy()
             return
         end
-        self:Horde_AddMoney(-50)
+        self:Horde_AddMoney(-amount)
         local money = ents.Create("horde_money")
         local pos = self:GetPos()
         local dir = (self:GetEyeTrace().HitPos - pos)
@@ -193,11 +221,13 @@ function plymeta:Horde_DropMoney()
         local drop_pos = pos + dir * 50
         drop_pos.z = pos.z + 15
         money:SetPos(drop_pos)
-        money:DropToFloor()
+        --money:DropToFloor() -- DropToFloor() causes money to fall through dispacements and slopes
         money:Spawn()
+		money:SetMoney(amount)
         self:Horde_SyncEconomy()
     end
 end
+
 
 function plymeta:Horde_GetMaxWeight()
     return self.Horde_max_weight
@@ -235,24 +265,20 @@ function plymeta:Horde_RecalcWeight()
 end
 
 hook.Add("PlayerSpawn", "Horde_Economy_Sync", function (ply)
+    if ply.Horde_Fake_Respawn == true then return end
     hook.Run("Horde_ResetStatus", ply)
     net.Start("Horde_ClearStatus")
     net.Send(ply)
     ply:SetCustomCollisionCheck(true)
     HORDE.refresh_living_players = true
 
-    --[[if not ply.killed then
-        ply:KillSilent()
-        timer.Simple(10, function ()
-            ply.killed = true
-            ply:Spawn()
-        end)
-    end]]--
-
     if HORDE.start_game and HORDE.current_break_time <= 0 then
         if ply:IsValid() then
-            ply:KillSilent()
-            HORDE:SendNotification("You will respawn next wave.", 0, ply)
+            local ret = hook.Run("Horde_OnPlayerShouldRespawnDuringWave")
+            if not ret then
+                ply:KillSilent()
+                HORDE:SendNotification("You will respawn next wave.", 0, ply)
+            end
         end
     end
 
@@ -323,13 +349,37 @@ hook.Add("PlayerDroppedWeapon", "Horde_Economy_Drop", function (ply, wpn)
                (class == "horde_astral_relic" and ply:Horde_GetCurrentSubclass() == "Warlock") or
                (class == "horde_carcass" and ply:Horde_GetCurrentSubclass() == "Carcass") or
                (class == "horde_pheropod" and ply:Horde_GetCurrentSubclass() == "Hatcher") then
-                wpn:Remove()
                 local c = wpn:GetClass()
-                timer.Simple(0, function()
-                    if ply:Alive() then
-                        ply:Give(c)
-                    end
-                end)
+                if (wpn.Base == "horde_spell_weapon_base") then
+                    -- Store spell cooldowns
+                    local primary_next = wpn:GetNextPrimaryFire()
+                    local secondary_next = wpn:GetNextSecondaryFire()
+                    local utility_next = wpn:GetNextUtilityFire()
+                    local ultimate_next = wpn:GetNextUltimateFire()
+
+                    wpn:Remove()
+                    timer.Simple(0, function()
+                        if ply:Alive() then
+                            ply:Give(c)
+                            timer.Simple(0, function ()
+                                local w2 = ply:Horde_GetSpellWeapon()
+                                if w2 then
+                                    w2:SetNextPrimaryFire(primary_next)
+                                    w2:SetNextSecondaryFire(secondary_next)
+                                    w2:SetNextUtilityFire(utility_next)
+                                    w2:SetNextUltimateFire(ultimate_next)
+                                end
+                            end)
+                        end
+                    end)
+                else
+                    wpn:Remove()
+                    timer.Simple(0, function()
+                        if ply:Alive() then
+                            ply:Give(c)
+                        end
+                    end)
+                end
             end
         end
 
@@ -363,6 +413,9 @@ hook.Add("PlayerCanPickupWeapon", "Horde_Economy_Pickup", function (ply, wpn)
         end
         if ply:Horde_GetCurrentSubclass() == "Carcass"
         and (item.class ~= "horde_carcass" and item.class ~= "weapon_horde_medkit") then
+            return false
+        end
+        if ply:Horde_GetSpellWeapon() and (item.class ~= "weapon_horde_medkit") then
             return false
         end
     end
@@ -478,6 +531,7 @@ net.Receive("Horde_BuyItem", function (len, ply)
                             ent:AddRelationship("npc_manhack D_LI 99")
                         end
                         ent:AddRelationship("npc_vj_horde_spectre D_LI 99")
+                        ent:AddRelationship("npc_vj_horde_shadow_hulk D_LI 99")
                         ent:AddRelationship("npc_vj_horde_headcrab D_LI 99")
                         ent:AddRelationship("npc_vj_horde_antlion D_LI 99")
     
@@ -497,18 +551,18 @@ net.Receive("Horde_BuyItem", function (len, ply)
                     -- Special case for turrets
                     local id = ent:GetCreationID()
                     if ent:GetClass() == "npc_turret_floor" then
-                        ent:SetCollisionGroup(COLLISION_GROUP_WORLD)
-                        timer.Create("Horde_MinionCollision" .. id, 1, 0, function ()
-                            if not ent:IsValid() then timer.Remove("Horde_MinionCollision" .. id) return end
-                            ent:SetCollisionGroup(COLLISION_GROUP_WORLD)
+                        ent:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+                        timer.Simple(0.1, function ()
+                            if not ent:IsValid() then return end
+                            ent:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
                         end)
                         HORDE:DropTurret(ent)
                     else
-                        --[[ent:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
-                        timer.Create("Horde_MinionCollision" .. id, 1, 0, function ()
-                            if not ent:IsValid() then timer.Remove("Horde_MinionCollision" .. id) return end
+                        ent:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+                        timer.Simple(0.1, function ()
+                            if not ent:IsValid() then return end
                             ent:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
-                        end)]]--
+                        end)
                     end
 
                     -- Count Minions
@@ -568,7 +622,7 @@ net.Receive("Horde_BuyItem", function (len, ply)
                         net.WriteUInt(1, 3)
                     net.Send(ply)
                 end
-                ply:SetArmor(item.entity_properties.armor)
+                ply:SetArmor(ply:GetMaxArmor() * item.entity_properties.armor / 100)
                 ply:Horde_AddMoney(-price)
                 ply:Horde_AddSkullTokens(-skull_tokens)
                 ply:Horde_SyncEconomy()
@@ -590,6 +644,19 @@ net.Receive("Horde_BuyItem", function (len, ply)
         end
 
         HORDE:SendNotification("You bought " .. item.name .. ".", 0, ply)
+        ply:Horde_SyncEconomy()
+    end
+end)
+
+net.Receive("Horde_BuySpell", function (len, ply)
+    if not ply:IsValid() or not ply:Alive() then return end
+    local spell_name = net.ReadString()
+    if not HORDE.spells[spell_name] then return end
+    local price = HORDE.spells[spell_name].Price or 0
+    if ply:Horde_GetMoney() >= price then
+        ply:Horde_AddMoney(-price)
+        ply:Horde_SetSpell(spell_name)
+        HORDE:SendNotification("You bought " .. HORDE.spells[spell_name].PrintName .. ".", 0, ply)
         ply:Horde_SyncEconomy()
     end
 end)
@@ -628,13 +695,17 @@ function HORDE:DropTurret(ent)
 end
 
 hook.Add("OnPlayerPhysicsDrop", "Horde_TurretDrop", function (ply, ent, thrown)
-    if ent:GetNWEntity("HordeOwner") and (ent:GetClass() == "npc_turret_floor" or (ent:GetClass() == "npc_vj_horde_rocket_turret" and (not ent.Horde_Pickedup))) then
+    if ent:GetNWEntity("HordeOwner") and (ent:GetClass() == "npc_turret_floor" or (ent.Horde_TurretMinion and (not ent.Horde_Pickedup))) then
         -- Turrets should always stay straight.
         local a = ent:GetAngles()
-        ent:SetAngles(Angle(0, a.y, 0))
+        if ent:GetClass() == "npc_vj_horde_sniper_turret" then
+        else
+            ent:SetAngles(Angle(0, a.y, 0))
+        end
+        
         HORDE:DropTurret(ent)
 
-        if ent:GetClass() == "npc_vj_horde_rocket_turret" then
+        if ent:GetClass() == "npc_vj_horde_rocket_turret" || ent:GetClass() == "npc_vj_horde_laser_turret" then
             ent:SetAngles(Angle(0,0,0))
             ent:PhysicsInit(SOLID_OBB)
         end
@@ -757,6 +828,7 @@ net.Receive("Horde_SelectClass", function (len, ply)
     ply:Horde_SetMinionCount(0)
 
     ply:Horde_SetMaxWeight(HORDE.max_weight)
+    ply:Horde_UnsetSpellWeapon()
     ply:Horde_ApplyPerksForClass()
     ply:Horde_SetWeight(ply:Horde_GetMaxWeight())
     if ply.Horde_Special_Armor then
@@ -777,6 +849,8 @@ net.Receive("Horde_SelectClass", function (len, ply)
     end
 
     ply:Horde_SyncEconomy()
+
+    HORDE:TryAddTopTen(ply)
 end)
 
 net.Receive("Horde_BuyItemAmmoPrimary", function (len, ply)
@@ -790,8 +864,16 @@ net.Receive("Horde_BuyItemAmmoPrimary", function (len, ply)
     
     local price = HORDE.items[class].ammo_price * count
     if ply:Horde_GetMoney() >= price then
-        ply:Horde_AddMoney(-price)
         local wpn = ply:GetWeapon(class)
+        if wpn.Primary and wpn.Primary.MaxAmmo then
+            if count + ply:GetAmmoCount(wpn:GetPrimaryAmmoType()) > wpn.Primary.MaxAmmo then
+                count = wpn.Primary.MaxAmmo - ply:GetAmmoCount(wpn:GetPrimaryAmmoType())
+            end
+            if wpn.Primary.MaxAmmo <= ply:GetAmmoCount(wpn:GetPrimaryAmmoType()) then
+                return
+            end
+        end
+        ply:Horde_AddMoney(-price)
         HORDE:GiveAmmo(ply, wpn, count)
         ply:Horde_SyncEconomy()
     end

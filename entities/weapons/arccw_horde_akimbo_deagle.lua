@@ -1,6 +1,7 @@
 if not ArcCWInstalled then return end
 if CLIENT then
-    killicon.AddAlias("arccw_horde_akimbo_deagle", "arccw_go_deagle")
+    SWEP.WepSelectIcon = surface.GetTextureID("arccw/weaponicons/arccw_horde_akimbo_deagle")
+    killicon.Add("arccw_horde_akimbo_deagle", "arccw/weaponicons/arccw_horde_akimbo_deagle", Color(0, 0, 0, 255))
 end
 SWEP.Base = "arccw_mw2_abase"
 SWEP.Spawnable = true
@@ -58,8 +59,8 @@ SWEP.Firemodes = {
 SWEP.NPCWeaponType = {"weapon_357"}
 SWEP.NPCWeight = 100
 
-SWEP.AccuracyMOA = 10 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
-SWEP.HipDispersion = 250 / 2 -- inaccuracy added by hip firing.
+SWEP.AccuracyMOA = 9 / 2 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
+SWEP.HipDispersion = 150 / 2.5 -- inaccuracy added by hip firing.
 SWEP.MoveDispersion = 50
 
 SWEP.Primary.Ammo = "357" -- what ammo type the gun uses
@@ -216,11 +217,11 @@ SWEP.Attachments = {
     },
     {
         PrintName = "Ammo Type",
-        Slot = "ammo_bullet"
+        Slot = "go_ammo"
     },
     {
         PrintName = "Perk",
-        Slot = "perk"
+        Slot = "go_perk"
     },
     {
         PrintName = "Skin",
@@ -231,16 +232,16 @@ SWEP.Attachments = {
 		DefaultAttIcon = Material("entities/acwatt_deagle_mw2.png", "smooth")
     },
     {
-        PrintName = "Akimbotest",
+        PrintName = "Akimbo",
         DefaultAttName = "No LH",
-        Slot = "akimbotest",
+        Slot = "akimbodeagle",
         Bone = "tag_view",
         Offset = {
             vpos = Vector(0, 0, 0),
             vang = Angle(0, 0, 0),
         },
         Hidden = true,
-        Installed = "mw2_akimbo_deagle",
+        Installed = "horde_akimbo_deagle",
     },
     {
         PrintName = "Charm",
@@ -269,6 +270,13 @@ SWEP.Hook_TranslateAnimation = function(wep, anim)
     elseif wep.Attachments[9].Installed then
         return anim .. "_akimbo_right"
     end
+end
+
+function SWEP:Hook_OnDeploy()
+    timer.Simple(0, function ()
+        if !IsValid(self) then return end
+        self:Attach(9, "horde_akimbo_deagle")
+    end)
 end
 
 SWEP.Animations = {

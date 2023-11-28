@@ -1,5 +1,8 @@
 
 AddCSLuaFile()
+if CLIENT then
+    killicon.Add("horde_carcass", "vgui/hud/punch", Color(0, 0, 0, 255))
+end
 
 SWEP.PrintName = "Carcass Biosystem"
 SWEP.Author = "Gorlami"
@@ -33,7 +36,7 @@ SWEP.Charging = 0
 SWEP.ChargingTimer = 0
 
 SWEP.Charged = 0
-SWEP.Delay = 0.5
+SWEP.Delay = 0.4
 SWEP.DrainInterval = 0.1
 SWEP.LastDrain = CurTime()
 SWEP.BaseDamage = 20
@@ -106,7 +109,7 @@ function SWEP:Punch(charged)
 	self:EmitSound( SwingSound )
 
 	self:UpdateNextIdle()
-	self:SetNextMeleeAttack( CurTime() + 0.2 )
+	self:SetNextMeleeAttack( CurTime() + 0.1 )
 
 	self:SetNextPrimaryFire( CurTime() + self.Delay )
 end
@@ -182,7 +185,6 @@ function SWEP:DealDamage()
 				if ply.Horde_Bio_Thruster_Stack and ply.Horde_Bio_Thruster_Stack > 0 then
 					bonus.increase = bonus.increase + ply.Horde_Bio_Thruster_Stack * 0.1
 				end
-				
 
 				dmginfo:ScaleDamage((1 + bonus.increase) * bonus.more)
 				dmginfo:SetDamageType(DMG_CLUB)

@@ -9,7 +9,7 @@ SWEP.Category = "ArcCW - Horde"
 SWEP.AdminOnly = false
 SWEP.WeaponCamBone = tag_camera
 
-SWEP.PrintName = "Medic 9mm (Horde)"
+SWEP.PrintName = "Medic 9mm"
 SWEP.Trivia_Class = "Pistol"
 SWEP.Trivia_Desc = "Standard issue pistol."
 
@@ -55,7 +55,7 @@ SWEP.Firemodes = {
     },
     {
         Mode = 0,
-    }
+    },
 }
 
 SWEP.NPCWeaponType = {"weapon_ar2", "weapon_smg1"}
@@ -244,4 +244,38 @@ function SWEP:DrawWeaponSelection(x, y, w, h, a)
     surface.SetMaterial(self.WepSelectIcon)
 
     surface.DrawTexturedRect(x, y, w, w / 2)
+end
+
+function SWEP:Hook_Think()
+    if SERVER then return end
+    local tr = util.TraceHull({
+        start = self:GetOwner():GetShootPos(),
+        endpos = self:GetOwner():GetShootPos() + self:GetOwner():GetAimVector() * 5000,
+        filter = filter,
+        mins = Vector(-20, -20, -8),
+        maxs = Vector(20, 20, 8),
+        mask = MASK_SHOT_HULL
+    })
+
+    if tr.Hit and tr.Entity and tr.Entity:IsPlayer()then
+        self.Horde_HealTarget = tr.Entity
+    else
+        self.Horde_HealTarget = nil
+    end
+end
+
+local function nv_center(ent)
+	return ent:LocalToWorld(ent:OBBCenter())
+end
+
+function SWEP:Hook_DrawHUD()
+    if self.Horde_HealTarget then
+        local pos = nv_center(self.Horde_HealTarget):ToScreen()
+		surface.SetDrawColor(Color(50, 200, 50))
+        surface.DrawCircle(pos.x, pos.y, 30)
+        --surface.DrawLine(pos.x, 0, pos.x, ScrH())
+        --surface.DrawLine(0, pos.y, ScrW(), pos.y)
+        draw.DrawText(self.Horde_HealTarget:Health(), "Trebuchet24",
+        pos.x - 15, pos.y - 15, Color(50, 200, 50), TEXT_ALIGN_LEFT)
+    end
 end

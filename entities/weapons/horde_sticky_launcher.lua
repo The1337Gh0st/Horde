@@ -75,17 +75,16 @@ end
 function SWEP:DrawHUD()
     if CLIENT then
     local x, y
+    local tr = self.Owner:GetEyeTrace()
     if ( self.Owner == LocalPlayer() and self.Owner:ShouldDrawLocalPlayer() ) then
-    local tr = util.GetPlayerTrace( self.Owner )
-    local trace = util.TraceLine( tr )
-    local coords = trace.HitPos:ToScreen()
-    x, y = coords.x, coords.y
+        local coords = tr.HitPos:ToScreen()
+        x, y = coords.x, coords.y
     else
-    x, y = ScrW() / 2, ScrH() / 2
+        x, y = ScrW() / 2, ScrH() / 2
     end
-    surface.SetTexture( surface.GetTextureID( "vgui/hud/special_crosshair" ) )
+    surface.SetTexture( surface.GetTextureID( "vgui/hud/gl_crosshair" ) )
     surface.SetDrawColor( 255, 255, 255, 255 )
-    surface.DrawTexturedRect( x - 16, y - 16, 32, 32 )
+    surface.DrawTexturedRect( x - ScrW() / 40, y - ScrW() / 40, ScrW() / 20, ScrW() / 20 )
     end
 end
 
@@ -168,8 +167,10 @@ function SWEP:PrimaryAttack()
             end
         end
         self:EmitSound(self.Primary.Sound)
-        self.Weapon:SendWeaponAnim(ACT_VM_PRIMARYATTACK)
-        self.Owner:SetAnimation(PLAYER_ATTACK1)
+        if SERVER then
+            self.Weapon:SendWeaponAnim(ACT_VM_PRIMARYATTACK)
+            self.Owner:SetAnimation(PLAYER_ATTACK1)
+        end
         self:TakePrimaryAmmo(self.Primary.TakeAmmo)
         self:SetNextPrimaryFire(CurTime() + self.Primary.Delay)
         self:SetNextSecondaryFire(CurTime() + self.Primary.Delay)

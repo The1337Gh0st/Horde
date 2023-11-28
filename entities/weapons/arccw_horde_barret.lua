@@ -26,12 +26,16 @@ SWEP.Slot = 2
 SWEP.UseHands = true
 
 SWEP.ViewModel = "models/weapons/arccw/fesiugmw2/c_barrett_1.mdl"
-SWEP.MirrorVMWM = false
-SWEP.WorldModel = "models/weapons/w_snip_sg550.mdl"
+SWEP.MirrorVMWM = true
+SWEP.WorldModelOffset = {
+    pos = Vector(0, 5, -8),
+    ang = Angle(-10, 0, 180),
+    scale = 1.25
+}
 SWEP.ViewModelFOV = 65
 
-SWEP.Damage = 900
-SWEP.DamageMin = 900
+SWEP.Damage = 850
+SWEP.DamageMin = 850
 SWEP.Range = 4000 -- in METRES
 SWEP.Penetration = 22
 
@@ -43,8 +47,8 @@ SWEP.Recoil = 2
 SWEP.RecoilSide = 5
 
 SWEP.AccuracyMOA = 0.01 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
-SWEP.HipDispersion = 200 -- inaccuracy added by hip firing.
-SWEP.MoveDispersion = 25
+SWEP.HipDispersion = 800 -- inaccuracy added by hip firing.
+SWEP.MoveDispersion = 100
 
 SWEP.Delay = 1.25 -- 60 / RPM.
 SWEP.Num = 1 -- number of shots per trigger pull.
@@ -78,7 +82,7 @@ SWEP.ShellRotateAngle = Angle(0, 90, 0)
 SWEP.MuzzleEffectAttachment = 1 -- which attachment to put the muzzle on
 SWEP.CaseEffectAttachment = 2 -- which attachment to put the case effect on
 
-SWEP.SpeedMult = 0.9
+SWEP.SpeedMult = 0.85
 SWEP.SightedSpeedMult = 0.40
 SWEP.SightTime = 0.4 / 1.25
 
@@ -130,6 +134,7 @@ SWEP.BarrelLength = 50
 SWEP.ExtraSightDist = 5
 SWEP.Bipod_Integral = false
 
+SWEP.RejectAttachments = {["go_homemade_auto"] = true, ["go_perk_burst"] = true}
 SWEP.Attachments = {
     {
         PrintName = "Optic",
@@ -140,6 +145,7 @@ SWEP.Attachments = {
             vpos = Vector(3, 0, 4.3),
             vang = Angle(0, 0, 0),
         },
+        Installed = "optic_m82scope",
     },
     {
         PrintName = "Muzzle",
@@ -178,7 +184,7 @@ SWEP.Attachments = {
     },
     {
         PrintName = "Perk",
-        Slot = "go_perk"
+        Slot = "go_perk",
     },
     {
         PrintName = "Camouflage",
@@ -272,3 +278,10 @@ SWEP.Animations = {
         LHIKOut = 0.5,
     },
 }
+
+function SWEP:Hook_OnDeploy()
+    timer.Simple(0, function ()
+        if !IsValid(self) then return end
+        self:Attach(1, "optic_m82scope")
+    end)
+end

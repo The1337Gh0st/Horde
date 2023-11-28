@@ -13,12 +13,10 @@ util.AddNetworkString("Horde_SyncClientExps")
 
 HORDE.vote_remaining_time = 60
 HORDE.game_end = nil
-
+local plymeta = FindMetaTable("Player")
 local map_list = {}
 local map_votes = {}
 local diff_votes = {}
-
-local plymeta = FindMetaTable("Player")
 
 function plymeta:Horde_SetGivenStarterWeapons(given)
     self.Horde_GivenStarterWeapons = given
@@ -229,6 +227,9 @@ function HORDE:GameEnd(status)
 
     net.Broadcast()
 
+    net.Start("Horde_SyncEscapeEnd")
+    net.Broadcast()
+
     timer.Remove("Horde_Main")
     timer.Remove("Horder_Counter")
     HORDE:BroadcastGameResultMessage(status, HORDE.current_wave)
@@ -401,6 +402,64 @@ function HORDE:PlayerInit(ply)
                 net.WriteString(HORDE:GetTip())
             net.Send(ply)
         end
+
+        if HORDE.horde_active_holdzones then
+            for id, zone in pairs(HORDE.horde_active_holdzones) do
+                net.Start("Horde_SyncHoldLocation")
+                net.WriteUInt(zone.Horde_Zone_Id, 4)
+                net.WriteVector(zone:GetPos())
+                net.WriteVector(zone:OBBMins())
+                net.WriteVector(zone:OBBMaxs())
+                net.Send(ply)
+            end
+
+            net.Start("Horde_RenderObjectives")
+            net.WriteUInt(HORDE.finished_objs, 4)
+            net.WriteUInt(HORDE.max_objs, 4)
+            net.Send(ply)
+        end
+
+        if HORDE.horde_active_escapezones then
+            for id, zone in pairs(HORDE.horde_active_escapezones) do
+                net.Start("Horde_SyncEscapeLocation")
+                net.WriteUInt(zone.Horde_Zone_Id, 4)
+                net.WriteVector(zone:GetPos())
+                net.WriteVector(zone:OBBMins())
+                net.WriteVector(zone:OBBMaxs())
+                net.Send(ply)
+            end
+            net.Start("Horde_RenderObjectives")
+            net.WriteUInt(HORDE.finished_objs, 4)
+            net.WriteUInt(HORDE.max_objs, 4)
+            net.Send(ply)
+        end
+
+        if HORDE.horde_active_payload_spawns then
+            for id, spawn in pairs(HORDE.horde_active_payload_spawns) do
+                net.Start("Horde_SyncPayloadLocation")
+                net.WriteUInt(spawn.Horde_Payload_Spawn_Id, 4)
+                net.WriteVector(spawn:GetPos())
+                net.Send(ply)
+
+                net.Start("Horde_SyncPayloadIcon")
+                net.WriteUInt(spawn.Horde_Payload_Spawn_Id, 4)
+                net.WriteUInt(spawn.Horde_Payload_Icon, 4)
+                net.Send(ply)
+            end
+            net.Start("Horde_SyncEscapeStart")
+            net.Send(ply)
+        end
+
+        if HORDE.horde_active_payload_destinations then
+            for id, dest in pairs(HORDE.horde_active_payload_destinations) do
+                net.Start("Horde_SyncPayloadDestinationLocation")
+                net.WriteUInt(dest.Horde_Payload_Destination_Id, 4)
+                net.WriteVector(dest:GetPos())
+                net.WriteVector(dest:OBBMins())
+                net.WriteVector(dest:OBBMaxs())
+                net.Send(ply)
+            end
+        end
     else
         if HORDE.player_money[ply:SteamID()] then
             ply:Horde_SetMoney(HORDE.player_money[ply:SteamID()])
@@ -416,6 +475,8 @@ function HORDE:PlayerInit(ply)
     end
 
     hook.Run("Horde_ResetStatus", ply)
+    -- Misc stuff
+    ply.Horde_Spectre_Max_Count = 1
     ply:Horde_ApplyPerksForClass()
     ply:Horde_SetWeight(ply:Horde_GetMaxWeight())
     HORDE.player_class_changed[ply:SteamID()] = false
@@ -431,6 +492,7 @@ function HORDE:PlayerInit(ply)
     for _, other_ply in pairs(player.GetAll()) do
         if other_ply == ply then goto cont end
         local subclass = other_ply:Horde_GetCurrentSubclass()
+        if not subclass then goto cont end
         net.Start("Horde_SyncExp")
             net.WriteEntity(other_ply)
             net.WriteString(subclass)
@@ -455,6 +517,12 @@ function HORDE:PlayerInit(ply)
     end
 
     ply.Horde_Init_Complete = true
+    local added = HORDE:TryAddTopTen(ply)
+    if not added then
+        net.Start("Horde_SyncTopTen")
+            net.WriteString(util.TableToJSON(HORDE.top_tens))
+        net.Broadcast()
+    end
 
     if not HORDE.has_buy_zone then
         net.Start("Horde_SyncStatus")
@@ -483,9 +551,6 @@ function HORDE:PlayerInit(ply)
     end
 
     HORDE:BroadcastPlayersReadyMessage(tostring(ready_count) .. "/" .. tostring(total_player))
-
-    -- Misc stuff
-    ply.Horde_Spectre_Max_Count = 1
 end
 
 net.Receive("Horde_PlayerInit", function (len, ply)
@@ -562,12 +627,19 @@ HORDE.VoteChangeMap = function (ply)
 end
 
 hook.Add("PlayerSpawn", "Horde_PlayerInitialSpawn", function(ply)
+    if ply.Horde_Fake_Respawn == true then return end
     if ply:IsValid() then
         ply:SetCollisionGroup(15)
         ply:SetCanZoom(false)
         ply:ConCommand([[mat_colorcorrection 1]])
         ply:ConCommand([[cl_showhints 0]])
         ply:SetMoveType(MOVETYPE_WALK)
+
+        local beacons = ents.FindByClass("horde_watchtower_beacon")
+        if beacons and #beacons > 0 then
+            local i = math.random(1, #beacons)
+            ply:SetPos(beacons[i]:GetPos() + Vector(0,0,24))
+        end
     end
 end)
 
@@ -581,6 +653,17 @@ hook.Add("Move", "Horde_PlayerMove", function (ply, mv)
         ply:SetRunSpeed(ply:Horde_GetClass().sprintspd * bonus_run.more * (1 + bonus_run.increase))
     end
 end)
+
+hook.Add("Horde_PlayerMoveBonus", "Horde_PlayerPayloadMove", function (ply, bonus_walk, bonus_run)
+    if ply:Horde_HasPayload() then
+        local mass = ply.Horde_Payload_Spawn.Horde_Payload_Mass
+        if mass and mass > 0 then
+            bonus_walk.more = bonus_walk.more * (1 - math.max(0.1, mass/100))
+            bonus_run.more = bonus_run.more * (1 - math.max(0.1, mass/100))
+        end
+    end
+end)
+
 
 local function Horde_DeathSpectatingFunction(victim, inflictor, attacker)
     if not HORDE.start_game or HORDE.current_break_time > 0 then return end
@@ -712,6 +795,8 @@ function HORDE:CheckAlivePlayers()
             -- ply:ScreenFade(SCREENFADE.OUT, Color(0,0,0), 6, 2)
             -- ply:Freeze(true)
         end
+        local ret = hook.Run("Horde_ShouldContinueGameWhenAllPlayersAreDead")
+        if ret then return end
         HORDE:GameEnd("DEFEAT")
     end
 end

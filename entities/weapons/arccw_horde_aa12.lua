@@ -26,13 +26,17 @@ SWEP.Slot = 2
 SWEP.UseHands = true
 
 SWEP.ViewModel = "models/weapons/arccw/fesiugmw2_2/c_aa12_1.mdl"
-SWEP.MirrorVMWM = false
-SWEP.WorldModel = "models/weapons/w_shot_xm1014.mdl"
+SWEP.MirrorVMWM = true
+SWEP.WorldModelOffset = {
+    pos = Vector(0, 3, -8),
+    ang = Angle(-10, 0, 180),
+    scale = 1.25
+}
 SWEP.ViewModelFOV = 65
 
 SWEP.Damage = 20
 SWEP.DamageMin = 15
-SWEP.Range = 300 * 0.025  -- GAME UNITS * 0.025 = METRES
+SWEP.Range = 800 * 0.025  -- GAME UNITS * 0.025 = METRES
 SWEP.Penetration = 1
 SWEP.DamageType = DMG_BULLET
 SWEP.ShootEntity = nil -- entity to fire, if any
@@ -47,12 +51,15 @@ SWEP.VisualRecoilMult = 0
 SWEP.Recoil = 2
 SWEP.RecoilSide = 3
 
-SWEP.Delay = 0.15 -- 60 / RPM.
+SWEP.Delay = 60 / 300 -- 60 / RPM.
 SWEP.Num = 8 -- number of shots per trigger pull.
 SWEP.RunawayBurst = false
 SWEP.Firemodes = {
     {
         Mode = 2,
+    },
+    {
+        Mode = 1,
     },
     {
         Mode = 0
@@ -62,9 +69,9 @@ SWEP.Firemodes = {
 SWEP.NPCWeaponType = "weapon_shotgun"
 SWEP.NPCWeight = 125
 
-SWEP.AccuracyMOA = 125 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
+SWEP.AccuracyMOA = 100 -- accuracy in Minutes of Angle. There are 60 MOA in a degree.
 SWEP.HipDispersion = 300 -- inaccuracy added by hip firing.
-SWEP.MoveDispersion = 275
+SWEP.MoveDispersion = 200
 
 SWEP.Primary.Ammo = "buckshot" -- what ammo type the gun uses
 
@@ -85,7 +92,7 @@ SWEP.ShellRotateAngle = Angle(0, 90, 0)
 SWEP.MuzzleEffectAttachment = 1 -- which attachment to put the muzzle on
 SWEP.CaseEffectAttachment = 2 -- which attachment to put the case effect on
 
-SWEP.SpeedMult = 1
+SWEP.SpeedMult = 0.9
 SWEP.SightedSpeedMult = 0.4
 SWEP.SightTime = 0.3
 
