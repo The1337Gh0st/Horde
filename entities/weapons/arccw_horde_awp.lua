@@ -442,10 +442,3 @@ sound.Add({
     volume = 1.0,
     sound = "arccw_go/awp/awp_boltback.wav"
 })
-
-function SWEP:Hook_OnDeploy()
-    timer.Simple(0, function ()
-        if !IsValid(self) then return end
-        self:Attach(1, "go_optic_awp")
-    end)
-end

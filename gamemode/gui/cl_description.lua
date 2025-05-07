@@ -47,6 +47,11 @@ function PANEL:Init()
     self.ammo_panel:DockMargin(5,2.5,5,2.5)
     self.ammo_panel:SetTall(50)
 
+    self.secondary_ammo_panel = vgui.Create("DPanel", self)
+    self.secondary_ammo_panel:Dock(BOTTOM)
+    self.secondary_ammo_panel:DockMargin(5,2.5,5,2.5)
+    self.secondary_ammo_panel:SetTall(50)
+
     self.ammo_one_btn = vgui.Create("DButton", self.ammo_panel)
     self.ammo_one_btn:Dock(LEFT)
     self.ammo_one_btn:DockMargin(0,0,2.5,0)
@@ -69,9 +74,9 @@ function PANEL:Init()
         surface.PlaySound("UI/buttonrollover.wav")
     end
 
-    self.ammo_secondary_btn = vgui.Create("DButton", self)
-    self.ammo_secondary_btn:Dock(BOTTOM)
-    self.ammo_secondary_btn:DockMargin(5,2.5,5,2.5)
+    self.ammo_secondary_btn = vgui.Create("DButton", self.secondary_ammo_panel)
+    self.ammo_secondary_btn:Dock(LEFT)
+    self.ammo_secondary_btn:DockMargin(0,0,2.5,0)
     self.ammo_secondary_btn:SetFont("Content")
     self.ammo_secondary_btn:SetTextColor(Color(0,0,0,0))
     self.ammo_secondary_btn:SetText("")
@@ -81,6 +86,18 @@ function PANEL:Init()
         surface.PlaySound("UI/buttonrollover.wav")
     end
 
+    self.ammo_secondary_ten_btn = vgui.Create("DButton", self.secondary_ammo_panel)
+    self.ammo_secondary_ten_btn:Dock(LEFT)
+    self.ammo_secondary_ten_btn:DockMargin(2.5,0,0,0)
+    self.ammo_secondary_ten_btn:SetFont("Content")
+    self.ammo_secondary_ten_btn:SetTextColor(Color(0,0,0,0))
+    self.ammo_secondary_ten_btn:SetText("")
+    self.ammo_secondary_ten_btn:SetTall(50)
+    self.ammo_secondary_ten_btn.Paint = function () end
+    self.ammo_secondary_ten_btn.OnCursorEntered = function ()
+        surface.PlaySound("UI/buttonrollover.wav")
+    end
+    
     self.upgrade_btn = vgui.Create("DButton", self)
     self.upgrade_btn:Dock(BOTTOM)
     self.upgrade_btn:DockMargin(5,2.5,5,2.5)
@@ -94,6 +111,7 @@ function PANEL:Init()
     end
 
     self.ammo_panel.Paint = function () end
+    self.secondary_ammo_panel.Paint = function() end
     self.ammo_one_btn.Paint = function () end
     self.ammo_ten_btn.Paint = function () end
 
@@ -123,7 +141,11 @@ function PANEL:Init()
     end
 
     function self.ammo_secondary_btn:DoClick()
-        self:GetParent():AmmoDoClick(-1)
+        self:GetParent():GetParent():AmmoDoClick(-1)
+    end
+
+    function self.ammo_secondary_ten_btn:DoClick()
+        self:GetParent():GetParent():AmmoDoClick(-10)
     end
 
     function self.upgrade_btn:DoClick()
@@ -137,16 +159,6 @@ function PANEL:Init()
     function self.subclass_btn:DoClick()
         self:GetParent():GetParent():SubclassDoClick()
     end
-    
-    self.perk_description_panel = vgui.Create("DScrollPanel", self)
-    self.perk_description_panel:Dock(FILL)
-    self.perk_description_panel:SetVisible(false)
-
-    self.perk_description_text = vgui.Create("DPanel", self.perk_description_panel)
-    self.perk_description_text:Dock(FILL)
-    
-    self.perk_description_text.Paint = function() end
-
 
     self.perk_panel = vgui.Create("DPanel", self)
     self.perk_panel:Dock(FILL)
@@ -224,12 +236,13 @@ function PANEL:AmmoDoClick(count)
         net.SendToServer()
         return
     end
-    if count == -1 then
+    if count <= -1 then
         -- Secondary ammo
         if self.item.secondary_ammo_price <= 0 or MySelf:Horde_GetMoney() < self.item.secondary_ammo_price then return end
         -- Buy the item
         net.Start("Horde_BuyItemAmmoSecondary")
         net.WriteString(self.item.class)
+        net.WriteUInt(-count, 4)
         net.SendToServer()
         return
     end
@@ -252,11 +265,10 @@ function PANEL:SellDoClick()
         if self.perk_panel:IsVisible() then
             self.subclass_panel:SetVisible(false)
         end
-        self.perk_description_panel:SetVisible(not self.perk_panel:IsVisible())
         return
     end
     if not MySelf:Alive() then return end
-    if MySelf:HasWeapon(self.item.class) or (self.item.entity_properties and (self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_DROP or self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_GADGET or self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_SPECIAL_UPGRADE)) then
+    if MySelf:HasWeapon(self.item.class) or (self.item.entity_properties and (self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_DROP or self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_GADGET)) then
         Derma_Query("Sell Item?!", "Sell",
                 "Yes",
                 function()
@@ -277,7 +289,6 @@ function PANEL:SubclassDoClick()
         -- Toggle subclasses
         self.perk_panel:SetVisible(false)
         self.subclass_panel:SetVisible(not self.subclass_panel:IsVisible())
-        self.perk_description_panel:SetVisible(not self.subclass_panel:IsVisible())
         return
     end
 end
@@ -288,7 +299,6 @@ function PANEL:SetData(item)
     if self.perk_layout then for _, v in pairs(self.perk_layout:GetChildren()) do v:Remove() end end
     if self.subclass_layout then for _, v in pairs(self.subclass_layout:GetChildren()) do v:Remove() end end
     self.perk_panel:SetVisible(false)
-    self.perk_description_panel:SetVisible(false)
     self.subclass_btn:SetVisible(false)
     self.item = item
     if self.item and self.item.Mind then
@@ -319,7 +329,7 @@ function PANEL:SetData(item)
         if self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_WPN then
             self.wpn = MySelf:GetWeapon(self.item.class)
         end
-        --if GetConVar("horde_default_item_config"):GetInt() == 1 then
+        if GetConVar("horde_default_item_config"):GetInt() == 1 then
             if self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_GADGET then
                 self.loc_name = translate.Get("Gadget_" .. self.item.class) or HORDE.gadgets[self.item.class].PrintName
                 self.loc_desc = translate.Get("Gadget_Desc_" .. self.item.class) or HORDE.gadgets[self.item.class].Description
@@ -360,7 +370,6 @@ function PANEL:SetData(item)
                 self.loc_name = translate.Get("Item_" .. self.item.name) or self.item.name
                 self.loc_desc = translate.Get("Item_Desc_" .. self.item.name) or self.item.description
             end
-        --[[ -- Is this needed here?
         else
             if self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_GADGET then
                 self.loc_name = translate.Get("Gadget_" .. self.item.class) or HORDE.gadgets[self.item.class].PrintName
@@ -386,7 +395,6 @@ function PANEL:SetData(item)
                 self.loc_name = self.item.name
             end
         end
-        ]]
     end
     if not self.item then return end
     if not self.item.class then
@@ -401,10 +409,6 @@ function PANEL:SetData(item)
         self.exp_diff = MySelf:Horde_GetExp(self.item.subclass.PrintName)
         self.exp_total = HORDE:GetExpToNextLevel(MySelf:Horde_GetLevel(self.item.subclass.PrintName) + 1)
         if GetConVar("horde_enable_perk"):GetInt() ~= 1 then return end
-        if not self.perk_description_scroll_panel then
-            self.perk_description_scroll_panel = vgui.Create("DScrollPanel", self.perk_description_panel)
-            self.perk_description_scroll_panel:SetSize(self:GetWide(), self:GetTall() + 80)
-        end
         if not self.perk_scroll_panel then
             self.perk_scroll_panel = vgui.Create("DScrollPanel", self.perk_panel)
             self.perk_scroll_panel:SetSize(self:GetWide(), self:GetTall() - 80)
@@ -475,7 +479,7 @@ function PANEL:SetData(item)
             self.subclass_layout:SetSpaceY(8)
             for _, v in pairs(self.subclass_layout:GetChildren()) do v:Remove() end
         end
-        
+
         local cur_panel = self.subclass_layout:Add("DIconLayout")
         cur_panel:SetSpaceX(4)
         cur_panel:SetSize(self:GetWide() - 8, 82)
@@ -545,7 +549,6 @@ function PANEL:IsUpgraded()
 end
 
 local mind_icon = Material("status/mind.png", "mips smooth")
-local star = Material("star.png", "mips smooth")
 function PANEL:Paint()
     surface.SetDrawColor(HORDE.color_hollow)
     surface.DrawRect(0, 0, self:GetWide(), self:GetTall())
@@ -591,7 +594,7 @@ function PANEL:Paint()
             elseif not self.level_satisfy then
                 self.buy_btn:SetTextColor(Color(200,200,200))
                 self.buy_btn:SetText("Rank Requirement(s) Not Met")
-                
+
                 self.buy_btn.Paint = function ()
                     surface.SetDrawColor(HORDE.color_crimson_dark)
                     surface.DrawRect(0, 0, self:GetWide(), 200)
@@ -613,6 +616,7 @@ function PANEL:Paint()
                             draw.SimpleText(rank_level, "Trebuchet18", start_pos - 5, y + 20, HORDE.Rank_Colors[rank], TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                         else
                             if rank_level > 0 then
+                                local star = Material("star.png", "mips smooth")
                                 surface.SetMaterial(star)
                                 local y_pos = y + 32
                                 for i = 0, rank_level - 1 do
@@ -651,7 +655,7 @@ function PANEL:Paint()
                 end
                 self.upgrade_btn:SetVisible(false)
             end
-            
+
             draw.DrawText(multlinetext(self.loc_desc, self:GetWide() - 128, "Content"), "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
             local w, h
             if string.sub(self.loc_desc,-1) == "\n" then
@@ -681,7 +685,7 @@ function PANEL:Paint()
             end
             draw.DrawText("Mind Cost: ", "Content", 50, 160 + h, Color(200, 200, 200), TEXT_ALIGN_LEFT)
             draw.DrawText(mc, "Content", 175, 160 + h, Color(200, 200, 200), TEXT_ALIGN_LEFT)
-            
+
             surface.SetMaterial(mind_icon)
             surface.SetDrawColor(color_white)
             surface.DrawTexturedRect(175 + surface.GetTextSize(mc) + 5, 157 + h, 25, 25)
@@ -740,7 +744,7 @@ function PANEL:Paint()
             local icon = nil
             local description = ""
             local atttbl = ArcCW.AttachmentTable[self.item.class]
-            if atttbl.Description then
+            if atttbl and atttbl.Description then
                 description = multlinetext(ArcCW.AttachmentTable[self.item.class].Description, self:GetWide() - 64, "Item")
                 -- TODO: This should take two parameters. Second one seems useless?
                 local pros, cons = ArcCW:GetProsCons(nil, atttbl, nil)
@@ -755,7 +759,8 @@ function PANEL:Paint()
                 end
                 description = description .. "\n\nEquip by Pressing C."
             end
-            if atttbl.Icon then
+
+            if atttbl and atttbl.Icon then
                 icon = ArcCW.AttachmentTable[self.item.class].Icon
                 draw.DrawText(self.item.name, "Title", self:GetWide() / 2 - 64, 32, Color(255, 255, 255), TEXT_ALIGN_CENTER)
                 draw.DrawText(description, "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
@@ -772,13 +777,8 @@ function PANEL:Paint()
 
         elseif self.item.extra_description then
             self.class_progress:SetVisible(not self.perk_panel:IsVisible())
-            if self.perk_panel:IsVisible() or self.subclass_panel:IsVisible() then
-                self.perk_description_panel:SetVisible(false)
-            else
-                self.perk_description_panel:SetVisible(true)
-            end
             local loc_name = translate.Get("Class_" .. self.item.subclass.PrintName) or self.item.subclass.PrintName
-            --draw.DrawText(loc_name, "Title", self:GetWide() / 2 - string.len(self.item.subclass.PrintName) - 20, 32, Color(255, 255, 255), TEXT_ALIGN_CENTER)
+            draw.DrawText(loc_name, "Title", self:GetWide() / 2 - string.len(self.item.subclass.PrintName) - 20, 32, Color(255, 255, 255), TEXT_ALIGN_CENTER)
 
             local loc_desc = translate.Get("Class_Description_" .. self.item.subclass.PrintName) or self.item.extra_description
             if GetConVar("horde_enable_perk"):GetInt() == 1 then
@@ -799,28 +799,18 @@ function PANEL:Paint()
                         ::cont::
                     end
                 end
-                local mt = multlinetext(loc_perk_desc, self.perk_description_scroll_panel:GetWide() - 50, 'Content')
-                self.perk_description_text.Paint = function()
-                    if self.item.subclass.ParentClass then
-                        draw.DrawText(mt, "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
-                    else
-                        draw.DrawText(mt .. "\n\n" .. loc_desc, "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
-                    end
-                    local mat = Material(self.item.subclass.Icon or self.item.icon, "mips smooth")
-                    surface.SetDrawColor(255, 255, 255, 255) -- Set the drawing color
-                    surface.SetMaterial(mat) -- Use our cached material
-                    draw.DrawText(loc_name, "Title", self:GetWide() / 2 - string.len(self.item.subclass.PrintName) - 20, 32, Color(255, 255, 255), TEXT_ALIGN_CENTER)
-                    surface.DrawTexturedRect(self:GetWide() / 2 + string.len(loc_name) * 2 + 20, 28, 40, 40)
+                if self.item.subclass.ParentClass then
+                    draw.DrawText(loc_perk_desc, "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
+                else
+                    draw.DrawText(loc_perk_desc .. "\n\n" .. loc_desc, "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
                 end
-                local text_w, text_h = surface.GetTextSize(mt)
-                self.perk_description_scroll_panel:SetTall(text_h + 100)
             else
                 draw.DrawText(loc_desc, "Content", 50, 80, Color(200, 200, 200), TEXT_ALIGN_LEFT)
             end
-            --surface.SetDrawColor(255, 255, 255, 255) -- Set the drawing color
-            --local mat = Material(self.item.subclass.Icon or self.item.icon, "mips smooth")
-            --surface.SetMaterial(mat) -- Use our cached material
-            --surface.DrawTexturedRect(self:GetWide() / 2 + string.len(loc_name) * 2 + 20, 28, 40, 40)
+            surface.SetDrawColor(255, 255, 255, 255) -- Set the drawing color
+            local mat = Material(self.item.subclass.Icon or self.item.icon, "mips smooth")
+            surface.SetMaterial(mat) -- Use our cached material
+            surface.DrawTexturedRect(self:GetWide() / 2 + string.len(loc_name) * 2 + 20, 28, 40, 40)
 
             self.class_progress.Paint = function()
                 draw.SimpleText(translate.Get("Rank_" .. MySelf:Horde_GetRank(self.item.subclass.PrintName)) .. " " .. MySelf:Horde_GetRankLevel(self.item.subclass.PrintName), "Content", 0, 5, color_white, TEXT_ALIGN_LEFT)
@@ -933,14 +923,14 @@ function PANEL:Paint()
             end
 
             self.ammo_panel:SetVisible(false)
-            self.ammo_secondary_btn:SetVisible(false)
+            self.secondary_ammo_panel:SetVisible(false)
             self.current_ammo_panel:SetVisible(false)
             self.upgrade_btn:SetVisible(false)
-            
+
             return
         end
 
-        if MySelf:HasWeapon(self.item.class) or (self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_GADGET and MySelf:Horde_GetGadget() == self.item.class) or (MySelf.Horde_Special_Upgrades and MySelf.Horde_Special_Upgrades[self.item.class]) then
+        if MySelf:HasWeapon(self.item.class) or (self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_GADGET and MySelf:Horde_GetGadget() == self.item.class) then
             self.buy_btn:SetTextColor(Color(255,255,255))
             self.buy_btn:SetText("OWNED")
             self.buy_btn.Paint = function ()
@@ -980,18 +970,27 @@ function PANEL:Paint()
                     end
                 else
                     self.ammo_panel:SetVisible(false)
+                    self.secondary_ammo_panel:SetVisible(false)
                 end
 
                 if self.item.secondary_ammo_price and self.item.secondary_ammo_price > 0 then
-                    self.ammo_secondary_btn:SetVisible(true)
+                    self.secondary_ammo_panel:SetVisible(true)
+
                     self.ammo_secondary_btn:SetTextColor(Color(255,255,255))
+                    self.ammo_secondary_btn:SetWide(self:GetWide() / 2)
                     self.ammo_secondary_btn:SetText(translate.Get("Shop_Buy_Secondary_Ammo") .. " x 1 (" .. tostring(self.item.secondary_ammo_price) .. "$)")
                     self.ammo_secondary_btn.Paint = function ()
                         surface.SetDrawColor(HORDE.color_crimson)
                         surface.DrawRect(0, 0, self:GetWide(), 200)
                     end
-                else
-                    self.ammo_secondary_btn:SetVisible(false)
+
+                    self.ammo_secondary_ten_btn:SetTextColor(Color(255,255,255))
+                    self.ammo_secondary_ten_btn:SetWide(self:GetWide() / 2)
+                    self.ammo_secondary_ten_btn:SetText(translate.Get("Shop_Buy_Secondary_Ammo") .. " x 10 (" .. tostring(self.item.secondary_ammo_price * 10) .. "$)")
+                    self.ammo_secondary_ten_btn.Paint = function ()
+                        surface.SetDrawColor(HORDE.color_crimson)
+                        surface.DrawRect(0, 0, self:GetWide(), 200)
+                    end
                 end
 
                 if self:IsUpgradable() then
@@ -1023,14 +1022,14 @@ function PANEL:Paint()
                 end
             else
                 self.ammo_panel:SetVisible(false)
-                self.ammo_secondary_btn:SetVisible(false)
+                self.secondary_ammo_panel:SetVisible(false)
                 self.upgrade_btn:SetVisible(false)
                 self.current_ammo_panel.Paint = function () end
             end
         elseif not self.level_satisfy then
             self.buy_btn:SetTextColor(Color(200,200,200))
             self.buy_btn:SetText("Rank Requirement(s) Not Met")
-            
+
             self.buy_btn.Paint = function ()
                 surface.SetDrawColor(HORDE.color_crimson_dark)
                 surface.DrawRect(0, 0, self:GetWide(), 200)
@@ -1039,20 +1038,12 @@ function PANEL:Paint()
             local x, y =  self.buy_btn:GetPos()
             y = y - self.buy_btn:GetTall()
             local start_pos = x + 15
-            --local classes = {"Survivor", "Assault", "Heavy", "Medic", "Demolition", "Ghost", "Engineer", "Berserker", "Warden", "Cremator"}
-            local classes = {}
-            for k,v in pairs(HORDE.subclasses) do 
-                table.insert(classes, k)
-            end
+            local classes = {"Survivor", "Assault", "Heavy", "Medic", "Demolition", "Ghost", "Engineer", "Berserker", "Warden", "Cremator"}
             for _, class in pairs(classes) do
                 local level = self.item.levels[class]
                 if level and level > 0 then
-                    if(start_pos + 40 >= self:GetWide() * 1) then
-                        start_pos = x + 15
-                        y = y - 40
-                    end
                     local rank, rank_level = HORDE:LevelToRank(level)
-                    local mat = Material(HORDE.subclasses[class].Icon, "mips smooth")
+                    local mat = Material(HORDE.classes[class].icon, "mips smooth")
                     surface.SetMaterial(mat) -- Use our cached material
                     surface.SetDrawColor(HORDE.Rank_Colors[rank])
                     surface.DrawTexturedRect(start_pos, y + 5, 40, 40)
@@ -1060,6 +1051,7 @@ function PANEL:Paint()
                         draw.SimpleText(rank_level, "Trebuchet18", start_pos - 5, y + 20, HORDE.Rank_Colors[rank], TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                     else
                         if rank_level > 0 then
+                            local star = Material("star.png", "mips smooth")
                             surface.SetMaterial(star)
                             local y_pos = y + 32
                             for i = 0, rank_level - 1 do
@@ -1073,7 +1065,7 @@ function PANEL:Paint()
             end
 
             self.ammo_panel:SetVisible(false)
-            self.ammo_secondary_btn:SetVisible(false)
+            self.secondary_ammo_panel:SetVisible(false)
             self.current_ammo_panel.Paint = function () end
             self.sell_btn:SetVisible(false)
             self.upgrade_btn:SetVisible(false)
@@ -1090,7 +1082,7 @@ function PANEL:Paint()
             end
 
             self.ammo_panel:SetVisible(false)
-            self.ammo_secondary_btn:SetVisible(false)
+            self.secondary_ammo_panel:SetVisible(false)
             self.upgrade_btn:SetVisible(false)
             self.current_ammo_panel.Paint = function () end
             if self.item.entity_properties.type == HORDE.ENTITY_PROPERTY_DROP then
@@ -1135,14 +1127,14 @@ function PANEL:Paint()
             end
 
             self.ammo_panel:SetVisible(false)
-            self.ammo_secondary_btn:SetVisible(false)
+            self.secondary_ammo_panel:SetVisible(false)
             self.upgrade_btn:SetVisible(false)
             self.current_ammo_panel.Paint = function () end
         end
     else
         self.buy_btn:SetVisible(false)
         self.sell_btn:SetVisible(false)
-        self.ammo_secondary_btn:SetVisible(false)
+        self.secondary_ammo_panel:SetVisible(false)
         self.ammo_panel:SetVisible(false)
         self.upgrade_btn:SetVisible(false)
     end
